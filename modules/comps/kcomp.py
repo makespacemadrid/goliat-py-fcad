@@ -221,6 +221,67 @@ class HollowCyl(object):
         self.r_in   = self.d_in/2.   # inner radius
         self.r_out  = self.d_out/2.   # outer radius
 
+# ----------------------------- Idler pulley components --------
+# this is a name list from botton to top that shows the component
+# order to make an idler pulley out of washers and bearings
+
+idlepull_name_list = [
+            HollowCyl (part = 'washer', size = 6, kind= 'large'),
+            HollowCyl (part = 'washer', size = 4, kind= 'regular'),
+            HollowCyl (part = 'bearing', size = 624), # 624ZZ
+            HollowCyl (part = 'washer', size = 4, kind= 'regular'),
+            HollowCyl (part = 'washer', size = 6, kind= 'large'),
+            HollowCyl (part = 'washer', size = 4, kind= 'large')
+              ]
+
+def get_idlepull_maxbear_d (idlepull_list):
+    d_maxbear = 0
+    for ind, elem in enumerate(idlepull_list):
+        if elem.part == 'bearing':
+            if d_maxbear < elem.d_out :
+                d_maxbear = elem.d_out
+    return d_maxbear
+    
+
+# ----------------------------- NEMA motor dimensions --------
+
+# width of the motor (both dimensions: it is a square)
+NEMA_W  = {
+             11:  28.2,
+             14:  35.2,
+             17:  42.3,
+             23:  56.4,
+             34:  86.0,
+             42: 110.0 }
+
+# Separation of the holes for the bolts 
+NEMA_BOLT_SEP  = {
+             11:  23.0,
+             14:  26.0,
+             17:  31.0,
+             23:  47.1,
+             34:  69.6,
+             42:  89.0 }
+
+# Diameter of the shaft
+NEMA_SHAFT_D  = {
+             11:   5.0,
+             14:   5.0,
+             17:   5.0,
+             23:   6.35,
+             34:  14.0,
+             42:  19.0 }
+
+# Bolt diameter
+NEMA_BOLT_D  = {
+             11:   2.5,  # M2.5
+             14:   3.0,  # M3
+             17:   3.0,  # M3
+             23:   5.5,
+             34:   5.5,
+             42:   8.5 }
+
+
 
 # ----------------------------- shaft holder SK dimensions --------
 

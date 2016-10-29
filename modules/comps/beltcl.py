@@ -14,6 +14,18 @@ import FreeCAD;
 import Part;
 import Draft;
 
+
+import os
+# can be taken away after debugging
+# directory this file is
+filepath = os.getcwd()
+import sys
+# to get the components
+# In FreeCAD can be added: Preferences->General->Macro->Macro path
+sys.path.append(filepath)
+
+
+
 import kcomp  # import material constants and other constants
 import fcfun      # import my functions for freecad
 
@@ -27,25 +39,25 @@ from kcomp import TOL
 
 # --------------------------- belt clamp and tensioner
 # radius of the cylinder
-"""                           
-          TOPVIEW                    
-                CLAMPBLOCK          
-                    CB             
-                    ____     
-           CB_W  {  XXXX       ___
-           CB_IW {  ____      /   \
- 0,1 or 2: CB_MW {  XXXX      |   |   CCYL: CLAMPCYL 
-           CB_IW {  ____      \___/
-           CB_W  {  XXXX     
-        
-                    CB_L  CS
-
-
-    Y A  (width)
-      |
-      |---> X (length)
-
-"""
+#""                           
+#          TOPVIEW                    
+#                CLAMPBLOCK          
+#                    CB             
+#                    ____     
+#           CB_W  {  XXXX       ___
+#           CB_IW {  ____      /   \
+# 0,1 or 2: CB_MW {  XXXX      |   |   CCYL: CLAMPCYL 
+#           CB_IW {  ____      \___/
+#           CB_W  {  XXXX     
+#        
+#                    CB_L  CS
+#
+#
+#    Y A  (width)
+#      |
+#      |---> X (length)
+#
+#
 # Arguments:
 #  midblock: 0 or 1. It will add a none/single width middle block
 #                   In the future I may consider a double middle block (2)
@@ -54,7 +66,7 @@ from kcomp import TOL
 
 # Attributes:
 # fco : the FreeCAD Object of the belt clamp
-# BaseOffset : the FreeCAD object of the belt clamp offset. To make a cut
+# fco_cont : the FreeCAD object of the belt clamp offset. To make a cut
 #              on the FreeCAD object where the belt tensioner will be.
 
 
@@ -110,6 +122,7 @@ class Gt2BeltClamp (object):
 
     def __init__(self, base_h, midblock, name):
         doc = FreeCAD.ActiveDocument
+        self.base_place = (0,0,0)
         # Clamp base
         self.CBASE_H = base_h
         # divides how much is rail and how much is wall
@@ -213,7 +226,7 @@ class Gt2BeltClamp (object):
         gt2_baseof.Dir = (self.CBASE_L,0,0)
         gt2_baseof.Solid = True
 
-        self.BaseOffset = gt2_baseof
+        self.fco_cont = gt2_baseof
 
         # hole for the leadscrew bolt
         # the head is longer because it can be inserted deeper into the piece
@@ -269,6 +282,11 @@ class Gt2BeltClamp (object):
         gt2_clamp.Tool = gt2_clamp_holes
 
         self.fco = gt2_clamp   # the FreeCad Object
+
+    def BasePlace (self, position = (0,0,0)):
+        self.base_place = position
+        self.fco.Placement.Base = FreeCAD.Vector(position)
+        self.fco_cont.Placement.Base = FreeCAD.Vector(position)
 
     # --------------------------------------------------------------------
     # obtains the list of vectors for the base of the clamp
@@ -358,4 +376,86 @@ class Gt2BeltClamp (object):
         return gt2_base_list
     
 # end class Gt2BeltClamp:
+
+# ----------- shp_topbeltclamp
+# Creates a shape of a belt clamp. Just the rail and the cylinder
+# just one way: 2 clamp blocks
+# It is references at the end of the rail
+
+#""                           
+#          TOPVIEW                    
+#                CLAMPBLOCK          
+#                    CB             
+#                    ____       ___ 
+#           CB_W  {  XXXX      /   \
+#           CB_IW {  ____      |   |   CCYL: CLAMPCYL  
+#           CB_W  {  XXXX      \___/
+#        
+#                    CB_L  CS
+#
+
+def shp_topbeltclamp (railaxis = 'x', bot_norm = '-z', pos = V0, extra=1):
+
+    cyl_posx = Gt2BeltClamp.CB_L + Gt2BeltClamp.CS + Gt2BeltClamp.CCYL_R
+    height =  Gt2BeltClamp.C_H + extra
+
+    shpcyl = fcfun.shp_cyl(r= Gt2BeltClamp.CCYL_R,
+                           h= height,
+                           normal = VZ,
+                           pos = FreeCAD.Vector(cyl_posx,0,-extra) )
+
+    bl_posy0 = Gt2BeltClamp.CB_IW/2.
+    bl_posy1 = Gt2BeltClamp.CB_IW/2. + Gt2BeltClamp.CB_W
+
+    # block on top
+    blt_p0 = FreeCAD.Vector(0, bl_posy0, -extra)
+    blt_p1 = FreeCAD.Vector(Gt2BeltClamp.CB_L , bl_posy0, -extra)
+    blt_p2 = FreeCAD.Vector(Gt2BeltClamp.CB_L , bl_posy1, -extra)
+    blt_p3 = FreeCAD.Vector(0 , bl_posy1, -extra)
+    shp_wire_blt = Part.makePolygon([blt_p0,blt_p1,blt_p2,blt_p3, blt_p0])
+    shp_face_blt = Part.Face(shp_wire_blt)
+    shpblt = shp_face_blt.extrude(FreeCAD.Vector(0,0,height))
+    
+    # block on bottom
+    blb_p0 = FreeCAD.Vector(0 , -bl_posy1, -extra)
+    blb_p1 = FreeCAD.Vector(Gt2BeltClamp.CB_L , -bl_posy1, -extra)
+    blb_p2 = FreeCAD.Vector(Gt2BeltClamp.CB_L , -bl_posy0, -extra)
+    blb_p3 = FreeCAD.Vector(0, -bl_posy0, -extra)
+    shp_wire_blb = Part.makePolygon([blb_p0,blb_p1,blb_p2,blb_p3, blb_p0])
+    shp_face_blb = Part.Face(shp_wire_blb)
+    shpblb = shp_face_blb.extrude(FreeCAD.Vector(0,0,height))
+
+    shp_clamp = shpcyl.multiFuse([shpblt, shpblb])
+
+    vec_railaxis = fcfun.getvecofname(railaxis)
+    vec_botnorm = fcfun.getvecofname(bot_norm)
+
+    vrot = fcfun.calc_rot(vec_railaxis, vec_botnorm)
+
+    shp_clamp.Placement.Rotation = vrot
+    shp_clamp.Placement.Base = pos
+
+    return shp_clamp
+
+    #Part.show (shp_clamp)
+
+
+def fco_topbeltclamp (railaxis = 'x', bot_norm = '-z', pos = V0, extra=1,
+                      name = "bclamp"):
+
+    doc = FreeCAD.ActiveDocument
+    shptopbeltclamp = shp_topbeltclamp (railaxis = railaxis,
+                                        bot_norm = bot_norm,
+                                        pos = pos, extra= extra)
+    fcotopbeltclamp = doc.addObject("Part::Feature", name)
+    fcotopbeltclamp.Shape = shptopbeltclamp
+
+
+
+#doc = FreeCAD.newDocument()
+#shp = shp_topbeltclamp (railaxis = 'x', bot_norm= '-z', pos=FreeCAD.Vector(2,0,4))
+
+
+
+
 

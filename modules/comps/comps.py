@@ -16,6 +16,8 @@ import Part;
 import logging
 import os
 import Draft;
+import DraftGeomUtils;
+import DraftVecUtils;
 #import copy;
 #import Mesh;
 
@@ -329,18 +331,19 @@ class MisumiAlu30s6w8 (object):
 
         list_obj_alumprofile = []
         for obj in doc_sk.Objects:
-            """
-            if (hasattr(obj,'ViewObject') and obj.ViewObject.isVisible()
-                and hasattr(obj,'Shape') and len(obj.Shape.Faces) > 0 ):
-               # len(obj.Shape.Faces) > 0 to avoid sketches
-                list_obj_alumprofile.append(obj)
-            """
+            
+            #if (hasattr(obj,'ViewObject') and obj.ViewObject.isVisible()
+            #    and hasattr(obj,'Shape') and len(obj.Shape.Faces) > 0 ):
+            #   # len(obj.Shape.Faces) > 0 to avoid sketches
+            #    list_obj_alumprofile.append(obj)
             if len(obj.Shape.Faces) == 0:
                 orig_alumsk = obj
 
         FreeCAD.ActiveDocument = doc
         self.Sk = doc.addObject("Sketcher::SketchObject", 'sk_' + name)
         self.Sk.Geometry = orig_alumsk.Geometry
+        print (orig_alumsk.Geometry)
+        print (orig_alumsk.Constraints)
         self.Sk.Constraints = orig_alumsk.Constraints
         self.Sk.ViewObject.Visibility = False
 
@@ -536,6 +539,298 @@ class RectRndBar (object):
         
 # ----------- end class RectRndBar ----------------------------------------
             
+# ----------- NEMA MOTOR
+# Creates NEMA motor including its hole to cut the piece where is going
+# to be embebbed
+
+# ARGUMENTS:
+# size: size of the motor: 11, 14, 17, 23, 34 or 42
+# length: length of the motor
+# shaft_l: length of the motor shaft
+# chmf: the chamfer of the corners, as it were a radius
+#       0: no chamfer
+# circle_r: the radius of the little circle on the base of the shaft.
+#           if 0, not defined, I will take the half of the bolt separation 
+# circle_h: the height of the circle. If cero, no circle
+# rshaft_l: length of the motor the rear shaft. 0 if it doesn't have
+# bolt_depth: depth of the bolts holes inside the motor
+# bolt_out: length of the bolts holes outside the motor
+# container: 1: if you want to have a container to make a hole to fit it in
+#               a piece
+# normal: direction of the shaft
+# pos   : position of the base of the shaft. Not considering the circle that
+#         usually is on the base of the shaft
+
+# ATTRIBUTES: all the arguments, and:
+# fco: the FreeCad Object of the motor
+# shp_cont: the container of the motor. To cut other pieces. It is a shape
+#           not a FreeCad Object (fco)
+# fco_cont: Having problems with shapes and fco. So I will do it with fco 
+#           instead of shapes  To cut other pieces.
+#           Make decision about how to finally do it
+
+# base_place: position of the 2 elements: All of them have the same base
+#             position.
+#             It is (0,0,0) when initialized, it has to be changed using the
+#             function base_place
+
+
+class NemaMotor (object):
+
+    def __init__ (self, size, length, shaft_l, 
+                  circle_r, circle_h, name = "nemamotor", chmf = 1, 
+                  rshaft_l=0, bolt_depth = 3, bolt_out = 2, container=1,
+                  normal = VZ, pos = V0):
+
+        doc = FreeCAD.ActiveDocument
+        self.base_place = (0,0,0)
+        self.size = size
+        self.width = kcomp.NEMA_W[size]
+        self.length = length
+        self.shaft_l = shaft_l
+        self.circle_r = circle_r
+        self.circle_h = circle_h
+        self.chmf = chmf
+        self.rshaft_l = rshaft_l
+        self.bolt_depth = bolt_depth
+        self.bolt_out = bolt_out
+        self.container = container
+        nnormal = DraftVecUtils.scaleTo(normal,1)
+        self.normal = nnormal
+        self.pos = pos
+        nemabolt_d = kcomp.NEMA_BOLT_D[size]
+        self.nemabolt_d = nemabolt_d
+        mtol = kcomp.TOL - 0.1
+
+        lnormal = DraftVecUtils.scaleTo(nnormal,length)
+        neg_lnormal = DraftVecUtils.neg(lnormal)
+
+        # motor shape
+        v1 = FreeCAD.Vector(self.width/2.-chmf, self.width/2.,0)
+        v2 = FreeCAD.Vector(self.width/2.,   self.width/2.-chmf,0)
+        motorwire = fcfun.wire_sim_xy([v1,v2])
+        # motor wire normal is VZ
+        # DraftVecUtils doesnt work as well
+        # rot = DraftVecUtils.getRotation(VZ, nnormal)
+        # the order matter VZ, nnormal. It seems it doent matter VZ or VZN
+        # this is valid:
+        #rot = DraftGeomUtils.getRotation(VZ,nnormal)
+        #print rot
+        rot = FreeCAD.Rotation(VZ,nnormal)
+        print rot
+        motorwire.Placement.Rotation = rot
+        motorwire.Placement.Base = pos
+        motorface = Part.Face(motorwire)
+        shp_motorbox = motorface.extrude(neg_lnormal)
+        # shaft shape
+        if rshaft_l == 0: # no rear shaft
+            shp_shaft = fcfun.shp_cyl (
+                               r=kcomp.NEMA_SHAFT_D[size]/2.,
+                               h= shaft_l,
+                               normal = nnormal,
+                               pos = pos)
+        else:
+            rshaft_posend = DraftVecUtils.scaleTo(neg_lnormal, rshaft_l+length)
+            shp_shaft = fcfun.shp_cyl (
+                               r=kcomp.NEMA_SHAFT_D[size]/2.,
+                               h= shaft_l + rshaft_l + length,
+                               normal = nnormal,
+                               pos = pos + rshaft_posend)
+                               
+        shp_motorshaft = shp_motorbox.fuse(shp_shaft)
+        # Bolt holes
+        # AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        # There is something wrong with the position of these bolts
+#        bhole00_pos = FreeCAD.Vector(-kcomp.NEMA_BOLT_SEP[size]/2,
+#                                     -kcomp.NEMA_BOLT_SEP[size]/2,
+#                                     -bolt_depth) + pos
+#        bhole01_pos = FreeCAD.Vector(-kcomp.NEMA_BOLT_SEP[size]/2,
+#                                      kcomp.NEMA_BOLT_SEP[size]/2,
+#                                     -bolt_depth) + pos
+#        bhole10_pos = FreeCAD.Vector( kcomp.NEMA_BOLT_SEP[size]/2,
+#                                     -kcomp.NEMA_BOLT_SEP[size]/2,
+#                                     -bolt_depth) + pos
+#        bhole11_pos = FreeCAD.Vector( kcomp.NEMA_BOLT_SEP[size]/2,
+#                                      kcomp.NEMA_BOLT_SEP[size]/2,
+#                                     -bolt_depth) + pos
+#        bhole00_posrot = DraftVecUtils.rotate(bhole00_pos, rot.Angle, rot.Axis)
+#        bhole01_posrot = DraftVecUtils.rotate(bhole01_pos, rot.Angle, rot.Axis)
+#        bhole10_posrot = DraftVecUtils.rotate(bhole10_pos, rot.Angle, rot.Axis)
+#        bhole11_posrot = DraftVecUtils.rotate(bhole11_pos, rot.Angle, rot.Axis)
+#        shp_bolt00 = fcfun.shp_cyl (
+#                                   r=kcomp.NEMA_BOLT_D[size]/2.+kcomp.TOL/2.,
+#                                   h=bolt_depth + shaft_l,
+#                                   normal = nnormal,
+#                                   pos= bhole00_posrot)
+#        shp_bolt01 = fcfun.shp_cyl ( 
+#                                   r=kcomp.NEMA_BOLT_D[size]/2.+kcomp.TOL/2.,
+#                                   h=bolt_depth + shaft_l,
+#                                   normal = nnormal,
+#                                   pos= bhole01_posrot)
+#        shp_bolt10 = fcfun.shp_cyl (
+#                                   r=kcomp.NEMA_BOLT_D[size]/2.+kcomp.TOL/2.,
+#                                   h=bolt_depth + shaft_l,
+#                                   normal = nnormal,
+#                                   pos= bhole10_posrot)
+#        shp_bolt11 = fcfun.shp_cyl (
+#                                   r=kcomp.NEMA_BOLT_D[size]/2.+kcomp.TOL/2.,
+#                                   h=bolt_depth + shaft_l,
+#                                   normal = nnormal,
+#                                   pos= bhole11_posrot)
+#        shp_bolts = shp_bolt00.multiFuse([shp_bolt01, shp_bolt10, shp_bolt11])
+
+
+        # list of shapes to make a fusion of the container
+        shp_contfuselist = []
+#        shp_contfuselist.append(shp_bolts)
+
+        b2hole00_pos = FreeCAD.Vector(-kcomp.NEMA_BOLT_SEP[size]/2,
+                                      -kcomp.NEMA_BOLT_SEP[size]/2,
+                                      -bolt_depth)
+        b2hole01_pos = FreeCAD.Vector(-kcomp.NEMA_BOLT_SEP[size]/2,
+                                       kcomp.NEMA_BOLT_SEP[size]/2,
+                                      -bolt_depth)
+        b2hole10_pos = FreeCAD.Vector( kcomp.NEMA_BOLT_SEP[size]/2,
+                                      -kcomp.NEMA_BOLT_SEP[size]/2,
+                                      -bolt_depth)
+        b2hole11_pos = FreeCAD.Vector( kcomp.NEMA_BOLT_SEP[size]/2,
+                                       kcomp.NEMA_BOLT_SEP[size]/2,
+                                      -bolt_depth)
+
+        b2hole00 = addBolt (
+            r_shank = nemabolt_d/2. + mtol/2.,
+            l_bolt = bolt_out + bolt_depth,
+            r_head = kcomp.D912_HEAD_D[nemabolt_d]/2. + mtol/2.,
+            l_head = kcomp.D912_HEAD_L[nemabolt_d] + mtol,
+            hex_head = 0, extra =1, support=1, headdown = 0, name ="b2hole00")
+
+        b2hole01 = Draft.clone(b2hole00)
+        b2hole01.Label = "b2hole01"
+        b2hole10 = Draft.clone(b2hole00)
+        b2hole10.Label = "b2hole10"
+        b2hole11 = Draft.clone(b2hole00)
+        b2hole11.Label = "b2hole11"
+
+        b2hole00.ViewObject.Visibility=False
+        b2hole01.ViewObject.Visibility=False
+        b2hole10.ViewObject.Visibility=False
+        b2hole11.ViewObject.Visibility=False
+
+        b2hole00.Placement.Base = b2hole00_pos
+        b2hole01.Placement.Base = b2hole01_pos
+        b2hole10.Placement.Base = b2hole10_pos
+        b2hole11.Placement.Base = b2hole11_pos
+
+        # it doesnt work if dont recompute here! probably the clones
+        doc.recompute()
+
+        b2holes_list = [b2hole00, b2hole01, b2hole10, b2hole11]
+        # not an efficient way, either use shapes or fco, but not both
+        shp_b2holes = b2hole00.Shape.multiFuse([b2hole01.Shape,
+                                                b2hole10.Shape,
+                                                b2hole11.Shape])
+        #Part.show(shp_b2holes)
+
+        b2holes = doc.addObject("Part::MultiFuse", "b2holes")
+        b2holes.Shapes = b2holes_list
+        b2holes.ViewObject.Visibility=False
+
+        shp_b2holes.Placement.Base = pos
+        shp_b2holes.Placement.Rotation = rot
+        shp_contfuselist.append(shp_b2holes)
+
+
+        # Circle on the base of the shaft
+        if circle_r == 0:
+            calcircle_r = kcomp.NEMA_BOLT_SEP[size]/2.
+        else:
+            calcircle_r = circle_r
+        if circle_h != 0:
+            shp_circle = fcfun.shp_cyl (
+                               r=calcircle_r,
+                               h= circle_h + 1, #supperposition for union
+                               normal = nnormal,
+                               #supperposition for union
+                               pos = pos - nnormal)
+            # fmotor: fused motor
+            shp_fmotor = shp_motorshaft.fuse(shp_circle)
+        else:
+            shp_fmotor = shp_motorshaft
+
+        #fmotor = doc.addObject("Part::Feature", "fmotor")
+        #fmotor.Shape = shp_fmotor
+
+        #shp_motor = shp_fmotor.cut(shp_bolts)
+        shp_motor = shp_fmotor.cut(shp_b2holes)
+        #Part.show(shp_bolts)
+        
+        # container
+        if container == 1:
+            # 2*TOL to make sure it fits
+            v1 = FreeCAD.Vector(self.width/2.-chmf/2. + 2*kcomp.TOL,
+                                self.width/2. + 2*kcomp.TOL, 0)
+            v2 = FreeCAD.Vector(self.width/2.+ 2*kcomp.TOL,
+                                self.width/2.-chmf/2. + 2*kcomp.TOL,0)
+            cont_motorwire = fcfun.wire_sim_xy([v1,v2])
+            cont_motorwire.Placement.Rotation = rot
+            cont_motorwire.Placement.Base = pos
+            cont_motorface = Part.Face(cont_motorwire)
+            shp_contmotor_box = cont_motorface.extrude(neg_lnormal)
+
+            # the container is much wider than the shaft
+
+            if rshaft_l == 0: # no rear shaft
+                shp_contshaft = fcfun.shp_cyl (
+                                   r=calcircle_r + kcomp.TOL,
+                                   h= shaft_l + 1,
+                                   normal = nnormal,
+                                   pos = pos - nnormal )
+            else:
+                shp_contshaft = fcfun.shp_cyl (
+                                   r=calcircle_r + kcomp.TOL,
+                                   h= shaft_l + rshaft_l + length,
+                                   normal = nnormal,
+                                   pos = pos + rshaft_posend)
+            shp_contfuselist.append(shp_contshaft)
+            shp_contmotor = shp_contmotor_box.multiFuse(shp_contfuselist)
+        else:
+            shp_contmotor = shp_motor # we put the same shape
+        
+
+        doc.recompute()
+
+        #fco_motor = doc.addObject("Part::Cut", name)
+        #fco_motor.Base = fmotor
+        #fco_motor.Tool = b2holes
+        fco_motor = doc.addObject("Part::Feature", name)
+        fco_motor.Shape = shp_motor
+
+        self.fco = fco_motor
+        self.shp_cont = shp_contmotor
+        #Part.show(shp_contmotor)
+
+
+        doc.recompute()
+
+
+   # Move the motor and its container
+    def BasePlace (self, position = (0,0,0)):
+        self.base_place = position
+        self.fco.Placement.Base = FreeCAD.Vector(position)
+        #self.shp_cont.Placement.Base = FreeCAD.Vector(position)
+        self.fco_cont.Placement.Base = FreeCAD.Vector(position)
+
+#doc =FreeCAD.newDocument()
+
+# Revisar este caso AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+# con los bolts
+#nm = NemaMotor(size=17, length=40, shaft_l=24, circle_r = 0,
+#               circle_h=2, name='nema17', chmf=2.,
+#               rshaft_l = 10, bolt_depth = 3, bolt_out=5,
+#               #normal= FreeCAD.Vector(1,-0.75,1), pos = FreeCAD.Vector(0,5,2))
+#               normal= FreeCAD.Vector(0,0,-1), pos = FreeCAD.Vector(-2,5,2))
+
+
 
 
 # ---------- class LinBearing ----------------------------------------
@@ -556,6 +851,11 @@ class RectRndBar (object):
 #             if -h/2: the plane will be cutting h/2
 #     r_tol : What to add to r_ext for the container cylinder
 #     h_tol : What to add to h for the container cylinder, half on each side
+
+# ARGUMENTS:
+# bearing: the fco (FreeCAD object) of the bearing
+# bearing_cont: the fco (FreeCAD object) of the container bearing. 
+#               to cut it
 
 # base_place: position of the 3 elements: All of them have the same base
 #             position.
@@ -907,30 +1207,30 @@ class T8NutHousing (object):
        
         # rotation vector calculation
         if nutaxis == 'x':
-           vec1 = (1,0,0)
+            vec1 = (1,0,0)
         elif nutaxis == '-x':
-           vec1 = (-1,0,0)
+            vec1 = (-1,0,0)
         elif nutaxis == 'y':
-           vec1 = (0,1,0)
+            vec1 = (0,1,0)
         elif nutaxis == '-y':
-           vec1 = (0,-1,0)
+            vec1 = (0,-1,0)
         elif nutaxis == 'z':
-           vec1 = (0,0,1)
+            vec1 = (0,0,1)
         elif nutaxis == '-z':
-           vec1 = (0,0,-1)
+            vec1 = (0,0,-1)
 
         if screwface_axis == 'x':
-           vec2 = (1,0,0)
+            vec2 = (1,0,0)
         elif screwface_axis == '-x':
-           vec2 = (-1,0,0)
+            vec2 = (-1,0,0)
         elif screwface_axis == 'y':
-           vec2 = (0,1,0)
+            vec2 = (0,1,0)
         elif screwface_axis == '-y':
-           vec2 = (0,-1,0)
+            vec2 = (0,-1,0)
         elif screwface_axis == 'z':
-           vec2 = (0,0,1)
+            vec2 = (0,0,1)
         elif screwface_axis == '-z':
-           vec2 = (0,0,-1)
+            vec2 = (0,0,-1)
 
         vrot = fcfun.calc_rot (vec1,vec2)
         vdesp = fcfun.calc_desp_ncen (

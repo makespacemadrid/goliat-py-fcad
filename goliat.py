@@ -40,11 +40,12 @@ filepath = os.getcwd()
 sys.path.append(filepath) 
 # Either one of these 2 to select the path, inside the tree, copied by
 # git subtree, or in its one place
-#sys.path.append(filepath + '/' + 'modules/comps'
+#sys.path.append(filepath + '/' + 'modules/comps')
 sys.path.append(filepath + '/' + '../comps')
 
 # where the freecad document is going to be saved
-savepath = filepath + "/../../freecad/goliat/py/"
+savepath = filepath + "/"
+#savepath = filepath + "/../../freecad/goliat/py/"
 
 import fcfun   # import my functions for freecad. FreeCad Functions
 import kcomp   # import material constants and other constants
@@ -106,6 +107,8 @@ LSPLATE_T =  20. * SCALE # thickness
 LSPLATE_R =  10. * SCALE # Radius of the corners (it is rounded)
 
 
+# list of the frame components
+frame_list = []
 
 # --------------- Vertical Frame Bars  ---------------------------
 # os: translate([-77, -77, 0]) rounded_square(4, 4, 100, 1); /oscad command
@@ -117,6 +120,7 @@ h_framez_00 = comps.RectRndBar (Base = RBAR_B, Height = RBAR_H,
                                 cx = True, cy= True, cz=False)
 
 framez_00 = h_framez_00.fco # the FreeCad Object
+frame_list.append (framez_00)
 frame_posx = FRAME_W/2 - RBAR_B/2.
 print "frame_pos_x "  + str(frame_posx) +  ' has to be 770'
 frame_posy = FRAME_L/2 - RBAR_B/2.
@@ -127,16 +131,19 @@ framez_00.Placement.Base = FreeCAD.Vector(-frame_posx, -frame_posy, 0)
 framez_10 = Draft.clone(framez_00)
 framez_10.Label = 'framez_10'
 framez_10.Placement.Base = FreeCAD.Vector(frame_posx, -frame_posy, 0)
+frame_list.append (framez_10)
 
 # os: translate([-77, 77, 0]) rounded_square(4, 4, 100, 1);
 framez_01 = Draft.clone(framez_00)
 framez_01.Label = 'framez_01'
 framez_01.Placement.Base = FreeCAD.Vector(-frame_posx, frame_posy, 0)
+frame_list.append (framez_01)
 
 # os: translate([77, 77, 0]) rounded_square(4, 4, 100, 1);
 framez_11 = Draft.clone(framez_00)
 framez_11.Label = 'framez_11'
 framez_11.Placement.Base = FreeCAD.Vector(frame_posx, frame_posy, 0)
+frame_list.append (framez_11)
 
 
 # --------------- Horizontal Frame Bars  ---------------------------
@@ -152,6 +159,7 @@ h_framey_00 = comps.RectRndBar (Base = RBAR_B, Height = RBAR_H,
                                 name = "framey_00",
                                 cx = True, cy= False, cz=True)
 framey_00 = h_framey_00.fco
+frame_list.append (framey_00)
 
 framey_00.Placement.Base = FreeCAD.Vector(- frame_posx,
                                           -(frame_posy-RBAR_B/2.),
@@ -162,6 +170,7 @@ framey_10.Label = 'framey_10'
 framey_10.Placement.Base = FreeCAD.Vector(  frame_posx,
                                           -(frame_posy-RBAR_B/2.),
                                             HB_FRAME_H)
+frame_list.append (framey_10)
 # X lower Bar 
 # os: translate([-75, -77, 10]) rotate([0, 90, 0]) rounded_square(4, 4, 150, 1);
 framex_l = FRAME_W - 2*RBAR_B
@@ -177,12 +186,14 @@ framex_00 = h_framex_00.fco
 framex_00.Placement.Base = FreeCAD.Vector(  0, # already centered
                                           - frame_posy,
                                             HB_FRAME_H)
+frame_list.append (framex_00)
 # os: translate([-75, 77, 10]) rotate([0, 90, 0]) rounded_square(4, 4, 150, 1);
 framex_10 = Draft.clone(framex_00)
 framex_10.Label = 'framex_10'
 framex_10.Placement.Base = FreeCAD.Vector(  0, # already centered
                                             frame_posy,
                                             HB_FRAME_H)
+frame_list.append (framex_10)
 
 # Y top Bars 
 # os: translate([77, 75, 98]) rotate([90, 0, 0]) rounded_square(4, 4, 150, 1);
@@ -191,12 +202,14 @@ framey_01.Label = 'framey_01'
 framey_01.Placement.Base = FreeCAD.Vector(- frame_posx,
                                           -(frame_posy-RBAR_B/2.),
                                             FRAME_H-RBAR_B/2.)
+frame_list.append (framey_01)
 # os: translate([77, 75, 98]) rotate([90, 0, 0]) rounded_square(4, 4, 150, 1);
 framey_11 = Draft.clone(framey_00)
 framey_11.Label = 'framey_11'
 framey_11.Placement.Base = FreeCAD.Vector(  frame_posx,
                                           -(frame_posy-RBAR_B/2.),
                                             FRAME_H-RBAR_B/2.)
+frame_list.append (framey_11)
 
 # X top Bars 
 # os: translate([-75, -77, 10]) rotate([0, 90, 0]) rounded_square(4, 4, 150, 1);
@@ -205,6 +218,7 @@ framex_01.Label = 'framex_01'
 framex_01.Placement.Base = FreeCAD.Vector(  0, # already centered
                                           - frame_posy,
                                             FRAME_H-RBAR_B/2.)
+frame_list.append (framex_01)
 
 # os: translate([-75, 77, 10]) rotate([0, 90, 0]) rounded_square(4, 4, 150, 1);
 framex_11 = Draft.clone(framex_00)
@@ -212,6 +226,10 @@ framex_11.Label = 'framex_11'
 framex_11.Placement.Base = FreeCAD.Vector(  0, # already centered
                                             frame_posy,
                                             FRAME_H-RBAR_B/2.)
+frame_list.append (framex_11)
+
+frame = doc.addObject("Part::Compound", "frame")
+frame.Links = frame_list
 
 
 # --------------- Y Rods  ---------------------------
@@ -244,6 +262,8 @@ rody_11.Placement.Base = FreeCAD.Vector( frame_posx, 0, T_RODY_H)
 
 # --------------- Gantry  ---------------------------
 
+gantry_list = []
+
 # Gantry Vertical Bars
 # os: translate([-77, -8, 17]) rounded_square(4, 4, 71, 1);
 gantryz_l = T_RODY_H - B_RODY_H - RBAR_H
@@ -264,24 +284,28 @@ print "gantry_posz: "  + str(gantry_posz) +  ' has to be 170'
 gantryz_00.Placement.Base = FreeCAD.Vector(- frame_posx,
                                            -gantry_posy,
                                             gantry_posz)
+gantry_list.append(gantryz_00)
 # os: translate([-77, 8, 17]) rounded_square(4, 4, 71, 1);
 gantryz_01 = Draft.clone(gantryz_00)
 gantryz_01.Label = 'gantryz_01'
 gantryz_01.Placement.Base = FreeCAD.Vector(-frame_posx,
                                             gantry_posy,
                                             gantry_posz)
+gantry_list.append(gantryz_01)
 # os: translate([77, -8, 17]) rounded_square(4, 4, 71, 1);
 gantryz_10 = Draft.clone(gantryz_00)
 gantryz_10.Label = 'gantryz_10'
 gantryz_10.Placement.Base = FreeCAD.Vector( frame_posx,
                                            -gantry_posy,
                                             gantry_posz)
+gantry_list.append(gantryz_10)
 # os: translate([77, 8, 17]) rounded_square(4, 4, 71, 1);
 gantryz_11 = Draft.clone(gantryz_00)
 gantryz_11.Label = 'gantryz_11'
 gantryz_11.Placement.Base = FreeCAD.Vector( frame_posx,
                                             gantry_posy,
                                             gantry_posz)
+gantry_list.append(gantryz_11)
 # Gantry Horizontal Y Bars
 # os: translate([-77, 10, 15]) rotate([90, 0, 0]) rounded_square(4, 4, 20, 1);
 h_gantryy_00 = comps.RectRndBar (Base = RBAR_B, Height = RBAR_H,
@@ -294,24 +318,28 @@ gantryy_00 = h_gantryy_00.fco
 gantryy_00.Placement.Base = FreeCAD.Vector(- frame_posx,
                                             0,  # already centered on Y
                                             B_RODY_H)
+gantry_list.append(gantryy_00)
 # os: translate([-77, 10, 90]) rotate([90, 0, 0]) rounded_square(4, 4, 20, 1);
 gantryy_01 = Draft.clone(gantryy_00)
 gantryy_01.Label = 'gantryy_01'
 gantryy_01.Placement.Base = FreeCAD.Vector(-frame_posx,
                                             0,  # already centered on Y
                                             T_RODY_H)
+gantry_list.append(gantryy_01)
 # os: translate([77, 10, 15]) rotate([90, 0, 0]) rounded_square(4, 4, 20, 1);
 gantryy_10 = Draft.clone(gantryy_00)
 gantryy_10.Label = 'gantryy_10'
 gantryy_10.Placement.Base = FreeCAD.Vector( frame_posx,
                                             0,  # already centered on Y
                                             B_RODY_H)
+gantry_list.append(gantryy_10)
 # os: translate([77, 10, 90]) rotate([90, 0, 0]) rounded_square(4, 4, 20, 1);
 gantryy_11 = Draft.clone(gantryy_00)
 gantryy_11.Label = 'gantryy_11'
 gantryy_11.Placement.Base = FreeCAD.Vector( frame_posx,
                                             0,  # already centered on Y
                                             T_RODY_H)
+gantry_list.append(gantryy_11)
 # Gantry Horizontal X Bars
 # os: translate([-75,-8, 90]) rotate([0, 90, 0]) rounded_square(4, 4, 150, 1);
 gantryx_0 = Draft.clone(framex_00)
@@ -319,6 +347,7 @@ gantryx_0.Label = 'gantryx_0'
 gantryx_0.Placement.Base = FreeCAD.Vector(  0, # already centered
                                            -gantry_posy,
                                             T_RODY_H)
+gantry_list.append(gantryx_0)
 
 # os: translate([-75, 8, 90]) rotate([0, 90, 0]) rounded_square(4, 4, 150, 1);
 gantryx_1 = Draft.clone(framex_00)
@@ -326,6 +355,10 @@ gantryx_1.Label = 'gantryx_1'
 gantryx_1.Placement.Base = FreeCAD.Vector( 0, # already centered
                                            gantry_posy,
                                            T_RODY_H)
+gantry_list.append(gantryx_1)
+
+gantry = doc.addObject("Part::Compound", "gantry")
+gantry.Links = gantry_list
 
 # ---------------- plates for the leadscrew or ballscrew
 # os: translate([0, -77, 87]) rounded_square(14, 2, 13, 1);
@@ -353,3 +386,8 @@ leadscrew.Placement.Base = FreeCAD.Vector( 0, 0, T_RODY_H)
 
 
 doc.recompute()
+
+# to se the origin and the axis
+guidoc.ActiveView.setAxisCross(True)
+
+doc.saveAs (savepath + filename + '.FCStd')

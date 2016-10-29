@@ -43,6 +43,9 @@ V0 = FreeCAD.Vector(0,0,0)
 VX = FreeCAD.Vector(1,0,0)
 VY = FreeCAD.Vector(0,1,0)
 VZ = FreeCAD.Vector(0,0,1)
+VXN = FreeCAD.Vector(-1,0,0)
+VYN = FreeCAD.Vector(0,-1,0)
+VZN = FreeCAD.Vector(0,0,-1)
 
 # color constants
 WHITE  = (1.0, 1.0, 1.0)
@@ -131,6 +134,69 @@ def addBox_cen(x, y, z, name, cx= False, cy=False, cz=False):
     
     return box
 
+
+# adds a shape of box, referenced on the specified axis, with its
+# Placement and Rotation at zero. So it can be referenced absolutely from
+# its given position
+
+def shp_boxcen(x, y, z, cx= False, cy=False, cz=False, pos=V0):
+    # we have to bring the active document
+    doc = FreeCAD.ActiveDocument
+
+    if cx == True:
+        x0 = -x/2.0
+        x1 =  x/2.0
+    else:
+        x0 =  0
+        x1 =  x
+    if cy == True:
+        y0 = -y/2.0
+        y1 =  y/2.0
+    else:
+        y0 =  0
+        y1 =  y
+    if cz == True:
+        z0 = - z/2.0
+    else:
+        z0 = 0
+
+    p00 = FreeCAD.Vector (x0,y0,z0) + pos
+    p10 = FreeCAD.Vector (x1,y0,z0) + pos
+    p11 = FreeCAD.Vector (x1,y1,z0) + pos
+    p01 = FreeCAD.Vector (x0,y1,z0) + pos
+    # the square
+    shp_wire_sq = Part.makePolygon([p00, p10, p11, p01, p00])
+    # the face
+    shp_face_sq = Part.Face(shp_wire_sq)
+    shp_box = shp_face_sq.extrude(FreeCAD.Vector(0,0,z))
+
+    doc.recompute()
+    
+    return shp_box
+
+# same as shp_bxcen but with a filleted dimension
+def shp_boxcenfill (x, y, z, fillrad,
+                   fx=False, fy=False, fz=True,
+                   cx= False, cy=False, cz=False, pos=V0):
+
+    shp_box = shp_boxcen (x=x, y=y, z=z, cx=cx, cy=cy, cz=cz, pos=pos)
+    edg_list = []
+    for ind, edge in enumerate(shp_box.Edges):
+        vertex0 = edge.Vertexes[0]
+        vertex1 = edge.Vertexes[1]
+        p0 = vertex0.Point
+        p1 = vertex1.Point
+        vdif = p1 - p0
+        if vdif.x != 0 and fx==True:
+            edg_list.append(edge)
+        elif vdif.y != 0 and fy==True:
+            edg_list.append(edge)
+        elif vdif.z != 0 and fz==True:
+            edg_list.append(edge)
+    shp_boxfill = shp_box.makeFillet(fillrad, edg_list)
+    return (shp_boxfill)
+
+
 # Add cylinder r: radius, h: height 
 def addCyl (r, h, name):
     # we have to bring the active document
@@ -184,6 +250,66 @@ def addCyl_pos (r, h, name, axis = 'z', h_disp = 0):
     cyl.Solid  = True 
 
     return cyl
+
+
+
+# same as addCyl_pos, but avoiding the creation of many FreeCAD objects
+# Add cylinder
+#     r: radius,
+#     h: height 
+#     name 
+#     normal: FreeCAD.Vector pointing to the normal (if its module is not one,
+#             the height will be larger than h
+#     pos: position of the cylinder
+
+def addCylPos (r, h, name, normal = VZ, pos = V0):
+    # we have to bring the active document
+    doc = FreeCAD.ActiveDocument
+
+    cir =  Part.makeCircle (r,   # Radius
+                            pos,     # Position
+                            normal)  # direction
+
+    #print "circle: %", cir_out.Curve
+
+    wire_cir = Part.Wire(cir)
+    face_cir = Part.Face(wire_cir)
+
+    dir_extrus = DraftVecUtils.scaleTo(normal, h)
+    shp_cyl = face_cir.extrude(dir_extrus)
+
+    cyl = doc.addObject("Part::Feature", name)
+    cyl.Shape = shp_cyl
+
+    return cyl
+
+
+# same as addCylPos, but just creates the shape
+# Add cylinder
+#     r: radius,
+#     h: height 
+#     normal: FreeCAD.Vector pointing to the normal (if its module is not one,
+#             the height will be larger than h
+#     pos: position of the cylinder
+
+def shp_cyl (r, h, normal = VZ, pos = V0):
+    # we have to bring the active document
+    doc = FreeCAD.ActiveDocument
+
+    cir =  Part.makeCircle (r,   # Radius
+                            pos,     # Position
+                            normal)  # direction
+
+    #print "circle: %", cir_out.Curve
+
+    wire_cir = Part.Wire(cir)
+    face_cir = Part.Face(wire_cir)
+
+    dir_extrus = DraftVecUtils.scaleTo(normal, h)
+    shpcyl = face_cir.extrude(dir_extrus)
+
+    return shpcyl
+
 
 
 # Add cylinder, with inner hole:
@@ -520,7 +646,7 @@ def wire_sim_xy (vecList):
    h_layer3d: height of the layer for printing, if 0, means that the support
               is not needed
    extra: 1 if you want 1 mm on top and botton to avoid cutting on the same
-               plane pieces after makeing differences 
+               plane pieces after making cuts (boolean difference) 
    support: 1 if you want to include a triangle between the shank and the head
               to support the shank and not building the head on the air
               using kcomp.LAYER3D_H
@@ -1019,5 +1145,22 @@ def calc_desp_ncen (Length, Width, Height,
     vdesp = FreeCAD.Vector(x,y,z)
     return vdesp
 
+
+def getvecofname(axis):
+
+    if axis == 'x':
+        vec = (1,0,0)
+    elif axis == '-x':
+        vec = (-1,0,0)
+    elif axis == 'y':
+        vec = (0,1,0)
+    elif axis == '-y':
+        vec = (0,-1,0)
+    elif axis == 'z':
+        vec = (0,0,1)
+    elif axis == '-z':
+        vec = (0,0,-1)
+
+    return vec
 
 
