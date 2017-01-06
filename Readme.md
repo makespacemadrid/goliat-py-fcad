@@ -1,7 +1,7 @@
-# FreeCAD Model of the Goliat printer/mill made from Python scripts de Python for FreeCAD
+# FreeCAD Model of the Goliat printer/mill made from Python scripts for FreeCAD
 
 The `goliat.py` file is run inside FreeCAD.
-Read this tutorial to know how to run a python script from FreeCAD
+Read the following tutorial to know how to run a python script from FreeCAD
 http://www.freecadweb.org/wiki/index.php?title=Python_scripting_tutorial
 
 To run this file, run FreeCAD in the directory you have the `goliat.py` file
@@ -31,9 +31,6 @@ Actually, I work with the `goliat` and `comps` directories at the same level. Si
 Following I show an example of the file structure that I have in my computer, 
 ```
 cad/
-  +-- frecad                  # FreeCAD designs
-      +-- comps
-          +-- misumi_profile_hfs_series_w8_30x30.FCStd
   +-- py_freecad              # python scripts for FreeCAD
       +-- goliat                # goliat scripts
           +-- goliat.py             # Goliat printer

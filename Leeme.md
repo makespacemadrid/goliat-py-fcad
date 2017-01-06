@@ -28,9 +28,6 @@ De hecho, yo suelo trabajar con los directorios `goliat` y `comps` al mismo nive
 Un ejemplo de la estructura de ficheros que tengo en mi ordenador seria la siguiente: 
 ```
 cad/
-  +-- frecad                  # FreeCAD designs
-      +-- comps
-          +-- misumi_profile_hfs_series_w8_30x30.FCStd
   +-- py_freecad              # python scripts for FreeCAD
       +-- goliat                # goliat scripts
           +-- goliat.py             # Goliat printer
